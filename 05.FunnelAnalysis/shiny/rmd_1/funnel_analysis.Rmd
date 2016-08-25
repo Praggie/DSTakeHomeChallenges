@@ -1,0 +1,110 @@
+---
+title: "Figures set 1"
+output: html_document
+runtime: shiny
+---
+
+```{r}
+require(data.table)
+require(dplyr)
+require(ggplot2)
+require(reshape2)
+
+setwd("../../")
+
+
+user_table = fread("data/user_table.csv")
+home_page_table = fread("data/home_page_table.csv")
+search_page_table = fread("data/search_page_table.csv")
+payment_page_table = fread("data/payment_page_table.csv")
+payment_confirm_table = fread("data/payment_confirmation_table.csv")
+
+list.of.tables = list(user_table, home_page_table, search_page_table, payment_page_table, payment_confirm_table)
+merged = Reduce(function(dt1, dt2) left_join(dt1, dt2, by = 'user_id'), list.of.tables)
+
+colnames(merged)[5:8] = c("home_page", "search_page", "payment_page", "payment_confirm")
+
+merged = as.data.table(merged)
+counted = merged[, .(home = sum(!is.na(home_page)), 
+                     search = sum(!is.na(search_page)),
+                     payment = sum(!is.na(payment_page)),
+                     paymentConfirm = sum(!is.na(payment_confirm))), by = c("device", "sex")]
+
+converted = melt(counted, id = c("device", "sex"), variable.name = "steps", value.name = "count")   
+converted = converted %>%
+  group_by(steps) %>%
+  mutate(totnum = sum(count)) %>%
+  ungroup() %>%
+  mutate(dum = (max(totnum) - totnum)/2,
+         maxx = totnum + dum,
+         minx = dum)
+  
+dummies = converted %>%
+  select(steps, dum) %>%
+  unique()%>%
+  mutate(device = "dummy", 
+         sex = "dummy",
+         count = dum) %>%
+  select(device, sex, steps, count)
+
+
+rates =  converted %>%
+  select(steps, totnum) %>%
+  group_by(steps) %>%
+  unique() %>%
+  ungroup() %>%
+  mutate( prevCount = lag(totnum),
+          rate = round(totnum/prevCount, 3)) %>%
+  select(steps, rate)
+
+rates = na.omit(rates)
+
+dt.all = converted %>%
+  select(device, sex, steps, count)%>%
+  rbind(dummies)
+
+dt.all = dt.all %>%
+  group_by(steps) %>%
+  mutate(pos = cumsum(count) - 0.5*count)
+
+dt.all$steps = factor(dt.all$steps, levels = c("paymentConfirm", "payment","search", "home"))
+dt.all$device = factor(dt.all$device, levels = c(unique(as.character(converted$device)), 'dummy'))
+dt.all$sex = factor(dt.all$sex, levels = c(unique(as.character(converted$sex)), 'dummy'))
+
+#-------------------------------------------------
+cols = c("#43a2ca", "#fdbb84", "#ffffff")
+
+ggplot() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = cols) +
+  geom_bar(data = arrange(dt.all, desc(device)), aes(x = steps, y = count, fill = device),
+           stat = "identity", width = 1) +
+  # geom_text(data = dt.all[dt.all$device != 'dummy',],
+  #           aes(x = steps, y = pos, label = paste0(dt.all$device, '-', count)),
+  #           size = 4, color = 'white', fontface = "bold") +
+  geom_text(data = rates, aes(x = steps, y = unique(dummies$count)[-1], label = paste0(rate*100, '%')), hjust=1.2,
+            color='darkblue', fontface="bold") + 
+  theme(legend.position='none', axis.ticks=element_blank(), axis.text.x=element_blank(),
+      axis.title.x=element_blank())
+  
+
+#----------------------------------------------------
+
+cols = c("#ffffff", "#2eb8b8", "#ff9999")
+
+ggplot() +
+  theme_minimal() +
+  coord_flip() +
+  scale_fill_manual(values = cols) +
+  geom_bar(data = arrange(dt.all, sex), aes(x = steps, y = count, fill = sex),
+           stat = "identity", width = 1) +
+  # geom_text(data = dt.all[dt.all$device != 'dummy',],
+  #           aes(x = steps, y = pos, label = paste0(dt.all$device, '-', count)),
+  #           size = 4, color = 'white', fontface = "bold") +
+  geom_text(data = rates, aes(x = steps, y = unique(dummies$count)[-1], label = paste0(rate*100, '%')), hjust=1.2,
+            color='darkblue', fontface="bold") + 
+  theme(axis.ticks=element_blank(), axis.text.x=element_blank(),
+        axis.title.x=element_blank())
+
+```

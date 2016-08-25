@@ -1,0 +1,34 @@
+---
+title: "Data check"
+output: html_document
+runtime: shiny
+---
+
+Obtain Summary of the data  
+
+```{r}
+dat <- read.csv("../../data/conversion_data.csv")
+summary(dat)
+```
+
+**country**             -   US > China > UK > Germany  
+**age**                 -   Mostly <= 36, i.e. young; Few old, possibly outliers  
+**new_user**            -   68.55% new users  
+**source**              -   Seo > Ads > Direct  
+**total_pages_visited** -   range: [1,29], mean = 4.873  
+**converted**           -   Conversion rate 3.226%  
+
+```{r}
+table(dat$age)
+```
+
+exclude data points with age >= 100
+
+```{r}
+dat <- dat[dat$age < 100,]
+```
+
+simple logistic regression first
+
+```{r}
+fit <- glm(converted ~ ., data = dat, family = "binomial")

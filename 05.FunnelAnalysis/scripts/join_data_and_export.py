@@ -9,7 +9,8 @@ with CONN.cursor() as cur:
                  "LEFT JOIN HomePage ON User.UserID = HomePage.UserID "
                  "LEFT JOIN SearchPage ON User.UserID = SearchPage.UserID "
                  "LEFT JOIN PaymentPage ON User.UserID = PaymentPage.UserID "
-                 "LEFT JOIN ConfirmationPage ON User.UserID = ConfirmationPage.UserID ")
+                 "LEFT JOIN ConfirmationPage ON User.UserID = ConfirmationPage.UserID "
+                 "ORDER BY User.Date ")
     )
     for row in cur:
         outF.write(",".join([str(s) for s in row]) + '\n')
